@@ -20,7 +20,7 @@ terraform {
 }
 
 provider "minikube" {
-  kubernetes_version = "v1.35.1"
+  kubernetes_version = var.kubernetes_version
 }
 
 provider "kubernetes" {
@@ -41,9 +41,7 @@ provider "helm" {
 }
 
 provider "argocd" {
-#   server_addr = "argocd.minikube.local:80"
-    server_addr = "localhost:8080" # Port-forwarding to argocd-server service
-  # Use gRPC Web over HTTPS (as configured in HTTPRoute)
+  server_addr = var.argocd_server_addr
   plain_text = true
   insecure   = true
   grpc_web   = true

@@ -1,5 +1,8 @@
+kubernetes_version=""
 install_falco = true
 falco_slack_webhook_url=""
+falco_alert_minimum_priority="warning"
 argocd_username=""
 argocd_password=""
+argocd_server_addr = "argocd.minikube.local:80"
 install_gatekeeper = true

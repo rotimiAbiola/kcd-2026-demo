@@ -114,7 +114,7 @@ module "falco" {
       config = {
         slack = {
           webhookurl      = var.falco_slack_webhook_url
-          minimumpriority = "warning"
+          minimumpriority = var.falco_alert_minimum_priority
           messageformat   = "rule: *{{ .Rule }}* on `{{ .Hostname }}` | priority: *{{ .Priority }}* | `{{ .Output }}`"
         }
       }
