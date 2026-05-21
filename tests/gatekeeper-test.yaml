@@ -1,0 +1,70 @@
+# 1. Privileged container — should be DENIED
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-privileged
+  namespace: test
+spec:
+  containers:
+  - name: test
+    image: alpine:3.19
+    securityContext:
+      privileged: true
+
+# 2. Missing resource limits — should be DENIED
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-no-limits
+  namespace: test
+spec:
+  containers:
+  - name: test
+    image: alpine:3.19
+
+# 3. hostNetwork — should be DENIED
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-hostnetwork
+  namespace: test
+spec:
+  hostNetwork: true
+  containers:
+  - name: test
+    image: alpine:3.19
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 100m, memory: 64Mi}
+
+# 4. Disallowed registry — should be DENIED
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-bad-registry
+  namespace: test
+spec:
+  containers:
+  - name: test
+    image: docker.io/alpine:3.19
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 100m, memory: 64Mi}
+
+# 5. Latest tag — should be DENIED
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-latest
+  namespace: test
+spec:
+  containers:
+  - name: test
+    image: alpine:latest
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 100m, memory: 64Mi}
+
+# Check audit violations on existing resources
+# kubectl describe blockprivilegedcontainers block-privileged-containers
+# kubectl describe requireresourcelimits require-resource-limits

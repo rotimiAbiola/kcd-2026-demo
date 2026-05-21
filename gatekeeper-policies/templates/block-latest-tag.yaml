@@ -1,0 +1,44 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: blocklatesttag
+  annotations:
+    description: >
+      Blocks use of the 'latest' image tag or untagged images in production namespaces.
+      Unversioned images break reproducibility and make rollbacks unreliable.
+spec:
+  crd:
+    spec:
+      names:
+        kind: BlockLatestTag
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package blocklatesttag
+
+        all_containers[container] {
+          container := input.review.object.spec.containers[_]
+        }
+        all_containers[container] {
+          container := input.review.object.spec.initContainers[_]
+        }
+
+        violation[{"msg": msg}] {
+          container := all_containers[_]
+          # Block explicit :latest tag
+          endswith(container.image, ":latest")
+          msg := sprintf(
+            "Container <%v> uses image <%v> with 'latest' tag. Pin to a specific version.",
+            [container.name, container.image]
+          )
+        }
+
+        violation[{"msg": msg}] {
+          container := all_containers[_]
+          # Block images with no tag at all (implicitly latest)
+          not contains(container.image, ":")
+          msg := sprintf(
+            "Container <%v> uses image <%v> with no tag. Pin to a specific version.",
+            [container.name, container.image]
+          )
+        }

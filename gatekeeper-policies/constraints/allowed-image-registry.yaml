@@ -1,0 +1,18 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: AllowedImageRegistry
+metadata:
+  name: allowed-image-registry-tenant
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchExpressions:
+        - key: pipeops.io/tenant
+          operator: Exists
+  parameters:
+    allowedRegistries:
+      - "harbor.pipeops.io"         # replace with your Harbor hostname
+      - "ghcr.io/pipeops"           # internal GitHub registry if used

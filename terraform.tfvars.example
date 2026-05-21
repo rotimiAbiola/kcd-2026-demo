@@ -1,0 +1,5 @@
+install_falco = true
+falco_slack_webhook_url=""
+argocd_username=""
+argocd_password=""
+install_gatekeeper = true

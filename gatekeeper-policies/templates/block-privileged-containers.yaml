@@ -1,0 +1,45 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: blockprivilegedcontainers
+  annotations:
+    description: >
+      Blocks containers running as privileged in tenant namespaces.
+      Privileged containers have full host access and are not permitted
+      in multi-tenant workloads.
+spec:
+  crd:
+    spec:
+      names:
+        kind: BlockPrivilegedContainers
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package blockprivilegedcontainers
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          container.securityContext.privileged == true
+          msg := sprintf(
+            "Container <%v> in pod <%v> is running as privileged. Not permitted in tenant namespaces.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.initContainers[_]
+          container.securityContext.privileged == true
+          msg := sprintf(
+            "Init container <%v> in pod <%v> is running as privileged. Not permitted in tenant namespaces.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.ephemeralContainers[_]
+          container.securityContext.privileged == true
+          msg := sprintf(
+            "Ephemeral container <%v> in pod <%v> is running as privileged. Not permitted in tenant namespaces.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }
