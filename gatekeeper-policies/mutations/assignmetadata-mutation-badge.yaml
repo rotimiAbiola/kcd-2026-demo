@@ -1,0 +1,20 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: AssignMetadata
+metadata:
+  name: demo-badge-gatekeeper-mutated
+  annotations:
+    description: >
+      Stamps every Pod with a label as it passes through the mutating
+      webhook, before it ever reaches a validating constraint. This is the
+      "badge at the front desk" step in the admission pipeline — nothing is
+      rejected here, the object is just marked and passed on.
+spec:
+  match:
+    scope: Namespaced
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+  location: "metadata.labels.gatekeeper-mutated"
+  parameters:
+    assign:
+      value: "true"

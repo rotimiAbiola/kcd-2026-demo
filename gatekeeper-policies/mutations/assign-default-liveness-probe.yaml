@@ -1,0 +1,37 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: demo-default-liveness-probe
+  annotations:
+    description: >
+      Injects a default liveness probe on any container that doesn't bring
+      its own, so a Pod that would otherwise be rejected by the
+      RequireProbes validating constraint can pass through already
+      compliant. Only fills the field when it's missing (pathTests
+      MustNotExist) — it never overwrites a probe the Pod author defined.
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchExpressions:
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist
+  location: "spec.containers[name:*].livenessProbe"
+  parameters:
+    pathTests:
+      - subPath: "spec.containers[name:*].livenessProbe"
+        condition: MustNotExist
+    assign:
+      value:
+        exec:
+          command: ["sh", "-c", "exit 0"]
+        initialDelaySeconds: 10
+        periodSeconds: 15
+        failureThreshold: 3

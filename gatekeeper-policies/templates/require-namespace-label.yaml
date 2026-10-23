@@ -1,0 +1,53 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requirenamespacelabel
+  annotations:
+    description: >
+      Requires that the namespace a pod is being admitted into carries a specific
+      label. Uses data.inventory (populated by the Gatekeeper Config sync) to
+      inspect the existing Namespace object — demonstrating cross-resource policy.
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequireNamespaceLabel
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            label:
+              type: string
+              description: "Namespace label key that must be present"
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package requirenamespacelabel
+
+        # Look up the admitting namespace from the synced inventory.
+        # This only works when the Gatekeeper Config syncs Namespace resources.
+        violation[{"msg": msg}] {
+          ns_name := input.review.object.metadata.namespace
+          required_label := input.parameters.label
+
+          # Retrieve the live Namespace object from OPA's data store
+          ns := data.inventory.cluster["v1"]["Namespace"][ns_name]
+
+          not ns.metadata.labels[required_label]
+
+          msg := sprintf(
+            "Namespace <%v> is missing required label <%v>. Add it before deploying workloads.",
+            [ns_name, required_label]
+          )
+        }
+
+        # If the namespace is not yet in inventory (sync lag), fail open with a warning.
+        # Remove this rule to fail closed instead.
+        violation[{"msg": msg}] {
+          ns_name := input.review.object.metadata.namespace
+          not data.inventory.cluster["v1"]["Namespace"][ns_name]
+          msg := sprintf(
+            "Namespace <%v> not found in Gatekeeper inventory. Ensure Config sync includes Namespaces.",
+            [ns_name]
+          )
+        }

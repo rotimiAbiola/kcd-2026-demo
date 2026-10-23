@@ -1,0 +1,59 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requireprobes
+  annotations:
+    description: >
+      Requires containers to define health check probes.
+      Which probes are enforced is configurable via parameters.probes:
+      any combination of "liveness", "readiness", and "startup".
+      Init containers are excluded — they run to completion and don't serve traffic.
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequireProbes
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            probes:
+              type: array
+              description: "Probe types to enforce: liveness, readiness, startup"
+              items:
+                type: string
+                enum: ["liveness", "readiness", "startup"]
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package requireprobes
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          "liveness" == input.parameters.probes[_]
+          not container.livenessProbe
+          msg := sprintf(
+            "Container <%v> in pod <%v> is missing a livenessProbe.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          "readiness" == input.parameters.probes[_]
+          not container.readinessProbe
+          msg := sprintf(
+            "Container <%v> in pod <%v> is missing a readinessProbe.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          "startup" == input.parameters.probes[_]
+          not container.startupProbe
+          msg := sprintf(
+            "Container <%v> in pod <%v> is missing a startupProbe.",
+            [container.name, input.review.object.metadata.name]
+          )
+        }

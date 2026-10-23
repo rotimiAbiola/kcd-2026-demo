@@ -1,8 +1,28 @@
-kubernetes_version=""
-install_falco = true
-falco_slack_webhook_url=""
-falco_alert_minimum_priority="warning"
-argocd_username=""
-argocd_password=""
-argocd_server_addr = "argocd.minikube.local:80"
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored, never commit real secrets.
+
+cluster_name       = "kcd-lab"
+kubernetes_version = "v1.35.1"
+
+# ArgoCD — batch 1 only needs argocd_username set to "admin" and any
+# non-empty placeholder for argocd_password (Terraform requires the variable
+# to be set even though batch 1 never connects to ArgoCD's API). After batch 1,
+# retrieve the real admin password and replace the placeholder before batch 2.
+# See README.md for the exact commands.
+
+argocd_server_addr = "localhost:8080" # reached via `kubectl port-forward`
+argocd_username     = "admin"
+argocd_password     = "placeholder-until-batch-2"
+
+# Feature flags — what ArgoCD installs in batch 2
+
+install_falco      = true
 install_gatekeeper = true
+
+# Falco / Falcosidekick
+# Required even if install_falco = false (Terraform validates all declared
+# variables regardless of whether a count = 0 resource ends up using them).
+# Use any non-empty placeholder if you don't want Slack alerts.
+
+falco_slack_webhook_url      = "https://hooks.slack.com/services/REPLACE/ME/PLACEHOLDER"
+falco_alert_minimum_priority = "warning"

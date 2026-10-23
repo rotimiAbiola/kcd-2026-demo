@@ -5,7 +5,7 @@ metadata:
   annotations:
     description: >
       Restricts container images to approved registries only.
-      Tenant workloads must pull from Harbor. Public registries
+      Tenant workloads must pull from Artifact Registry. Public registries
       are not permitted in production namespaces.
 spec:
   crd:
@@ -25,23 +25,35 @@ spec:
       rego: |
         package allowedimageregistry
 
-        # Extract registry prefix from image string
+        # Extract registry prefix from image string.
+        # A registry prefix only exists when there are multiple "/" components
+        # AND the first component looks like a hostname (contains "." or ":").
+        # Without this guard, "alpine:3.19" (one segment, ":" is the tag separator)
+        # would be misidentified as a registry named "alpine:3.19".
         get_registry(image) = registry {
           parts := split(image, "/")
-          # If first part contains a dot or colon, it's a registry hostname
+          count(parts) > 1
           contains(parts[0], ".")
           registry := parts[0]
         }
 
         get_registry(image) = registry {
           parts := split(image, "/")
+          count(parts) > 1
           contains(parts[0], ":")
           registry := parts[0]
         }
 
-        # Default to docker.io if no registry prefix
+        # Single-segment image (e.g. "alpine:3.19", "nginx:latest") — implicit docker.io
         get_registry(image) = "docker.io" {
           parts := split(image, "/")
+          count(parts) == 1
+        }
+
+        # Multi-segment with no registry prefix (e.g. "library/nginx:1.0") — implicit docker.io
+        get_registry(image) = "docker.io" {
+          parts := split(image, "/")
+          count(parts) > 1
           not contains(parts[0], ".")
           not contains(parts[0], ":")
         }

@@ -1,10 +1,12 @@
 resource "minikube_cluster" "docker" {
   driver       = "docker"
-  cluster_name = "tf-test-cluster"
+  cluster_name = var.cluster_name
+  cpus         = "4"
+  memory = "6000mb"
+  cni = "bridge"
   addons = [
     "default-storageclass",
-    "storage-provisioner",
-    "ingress"
+    "storage-provisioner"
   ]
 }
 

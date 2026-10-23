@@ -1,0 +1,32 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: demo-default-requests-cpu
+  annotations:
+    description: >
+      Injects a default CPU request on any container that doesn't bring its
+      own, so a Pod that would otherwise be rejected by the
+      RequireResourceLimits validating constraint can pass through already
+      compliant. Only fills the field when it's missing (pathTests
+      MustNotExist) — it never overwrites a value the Pod author set.
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchExpressions:
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist
+  location: "spec.containers[name:*].resources.requests.cpu"
+  parameters:
+    pathTests:
+      - subPath: "spec.containers[name:*].resources.requests.cpu"
+        condition: MustNotExist
+    assign:
+      value: "100m"

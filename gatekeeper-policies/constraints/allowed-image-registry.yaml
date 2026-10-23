@@ -1,7 +1,7 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: AllowedImageRegistry
 metadata:
-  name: allowed-image-registry-tenant
+  name: allowed-image-registry
 spec:
   enforcementAction: deny
   match:
@@ -10,9 +10,9 @@ spec:
         kinds: ["Pod"]
     namespaceSelector:
       matchExpressions:
-        - key: pipeops.io/tenant
+        - key: "afaas"
           operator: Exists
   parameters:
     allowedRegistries:
-      - "harbor.pipeops.io"         # replace with your Harbor hostname
-      - "ghcr.io/pipeops"           # internal GitHub registry if used
+      - "docker.io"   
+      - "ghcr.io"           

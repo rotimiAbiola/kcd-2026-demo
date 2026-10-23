@@ -7,7 +7,7 @@ module "gatekeeper" {
   project          = "default"
   repository_url   = "https://open-policy-agent.github.io/gatekeeper/charts"
   chart_name       = "gatekeeper"
-  chart_version    = "3.22.0"
+  chart_version    = "3.23.1"
   create_namespace = false
 
   sync_policy = {
@@ -27,9 +27,6 @@ module "gatekeeper" {
 
     replicas = 1
 
-    # ── Failure policy: Ignore on minikube ────────────────────────────────────
-    # Matches chart default intentionally — prevents minikube becoming
-    # unschedulable if Gatekeeper pod restarts during development
     validatingWebhookFailurePolicy  = "Ignore"
     validatingWebhookTimeoutSeconds = 3
 
@@ -37,12 +34,11 @@ module "gatekeeper" {
       "admission.gatekeeper.sh/ignore" = ["no-self-managing"]
     }
 
-    logLevel            = "DEBUG"   # verbose for local triage
+    logLevel            = "DEBUG"
     logDenies           = true
     emitAdmissionEvents = true
     emitAuditEvents     = true
 
-    # Faster audit cadence — tighter feedback loop in dev
     auditInterval             = 30
     constraintViolationsLimit = 20
     auditFromCache            = false
@@ -61,7 +57,6 @@ module "gatekeeper" {
     }
 
     controllerManager = {
-      # Keep chart default preferred anti-affinity — single node, required would prevent scheduling
       affinity = {
         podAntiAffinity = {
           preferredDuringSchedulingIgnoredDuringExecution = [
@@ -105,14 +100,12 @@ module "gatekeeper" {
       ]
     }
 
-    # No ServiceMonitor on minikube
     serviceMonitor = {
       enabled = false
     }
 
     metricsBackends = ["prometheus"]
-
-    disableMutation = true
+    disableMutation = false
   })
 }
 
@@ -134,6 +127,7 @@ resource "kubernetes_namespace_v1" "gatekeeper_minikube" {
   }
 }
 
+
 module "gpm" {
   source = "./modules/argocd-helm-app"
   count  = var.install_gatekeeper ? 1 : 0
@@ -143,7 +137,7 @@ module "gpm" {
   project          = "default"
   repository_url   = "https://sighupio.github.io/gatekeeper-policy-manager"
   chart_name       = "gatekeeper-policy-manager"
-  chart_version    = "0.14.0"
+  chart_version    = "0.17.0"
   create_namespace = false
 
   sync_policy = {
@@ -180,24 +174,19 @@ module "gpm" {
     }
 
     ingress = {
-      enabled          = true
+      enabled          = false
       ingressClassName = "nginx"
       annotations      = {}
       hosts = [
         {
-          host  = "gpm.minikube.local"
-          paths = [
-            {
-              path     = "/"
-              pathType = "Prefix"
-            }
-          ]
+          host     = "gpm.minikube.local"
+          pathType = "Prefix"
+          paths    = ["/"]
         }
       ]
-      tls = []   # no TLS on minikube
+      tls = [] 
     }
 
-    # Minimal resources for minikube
     resources = {
       requests = {
         cpu    = "100m"
@@ -211,7 +200,15 @@ module "gpm" {
 
     config = {
       auditResults    = true
-      refreshInterval = 15   # faster refresh in dev
+      refreshInterval = 15 
+    }
+
+    livenessProbe = {
+      timeoutSeconds      = 5
+      initialDelaySeconds = 15
+    }
+    readinessProbe = {
+      timeoutSeconds = 5
     }
   })
 }

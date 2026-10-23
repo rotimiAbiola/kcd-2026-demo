@@ -1,70 +1,287 @@
-# 1. Privileged container — should be DENIED
+# OPA Gatekeeper Policy Tests
+#
+# Apply: kubectl apply -f tests/gatekeeper-test.yaml
+# Each Pod is a separate YAML document (---).
+# DENIED pods will be rejected at admission with a clear violation message.
+# ALLOWED pods will be created successfully — delete them after: kubectl delete -f tests/gatekeeper-test.yaml
+#
+# Prerequisite: ensure the 'test' namespace exists:
+#   kubectl create namespace test
+
+# ── 1. Privileged container — DENIED by BlockPrivilegedContainers ────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-privileged
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     securityContext:
+#       privileged: true
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 2. Privileged init container — DENIED by BlockPrivilegedContainers ───────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-privileged-init
+#   namespace: test
+# spec:
+#   initContainers:
+#   - name: setup
+#     image: alpine:3.19
+#     securityContext:
+#       privileged: true
+#     resources:
+#       requests: {cpu: 50m, memory: 32Mi}
+#       limits: {cpu: 100m, memory: 64Mi}
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     command: ["sleep", "3600"]
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 3. Missing resource limits — DENIED by RequireResourceLimits ─────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-no-limits
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+
+# ── 4. hostNetwork — DENIED by BlockHostNamespaces ───────────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-hostnetwork
+#   namespace: test
+# spec:
+#   hostNetwork: true
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 5. hostPID — DENIED by BlockHostNamespaces ───────────────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-hostpid
+#   namespace: test
+# spec:
+#   hostPID: true
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 6. hostIPC — DENIED by BlockHostNamespaces ───────────────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-hostipc
+#   namespace: test
+# spec:
+#   hostIPC: true
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 7. Disallowed registry — DENIED by AllowedImageRegistry ──────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-bad-registry
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: badregistry.io/malware:1.0
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 8. Latest tag — DENIED by BlockLatestTag ─────────────────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-latest-tag
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine:latest
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 9. Untagged image (implicit :latest) — DENIED by BlockLatestTag ──────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-no-tag
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+
+# ── 10. Multiple violations — DENIED by several policies at once ──────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-multiple-violations
+#   namespace: test
+# spec:
+#   hostNetwork: true
+#   hostPID: true
+#   containers:
+#   - name: app
+#     image: badregistry.io/backdoor:latest
+#     securityContext:
+#       privileged: true
+    # no resource limits — violates RequireResourceLimits too
+
+# ── 11. Missing liveness probe — DENIED by RequireProbes ─────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-no-liveness
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     command: ["sleep", "3600"]
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+#     readinessProbe:
+#       exec:
+#         command: ["sh", "-c", "exit 0"]
+#       initialDelaySeconds: 5
+#       periodSeconds: 10
+    # no livenessProbe
+
+# ── 12. Missing readiness probe — DENIED by RequireProbes ────────────────────
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-no-readiness
+#   namespace: test
+# spec:
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     command: ["sleep", "3600"]
+#     resources:
+#       requests: {cpu: 100m, memory: 64Mi}
+#       limits: {cpu: 200m, memory: 128Mi}
+#     livenessProbe:
+#       exec:
+#         command: ["sh", "-c", "exit 0"]
+#       initialDelaySeconds: 10
+#       periodSeconds: 15
+    # no readinessProbe
+
+# ── 13. Fully compliant pod — should be ALLOWED ───────────────────────────────
+# Satisfies all policies: no privilege escalation, resource limits, approved
+# registry, pinned tag, host namespaces false, and both probes defined.
+# Expected: kubectl apply succeeds, pod reaches Running state.
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: test-compliant
+#   namespace: test
+#   labels:
+#     app: test-compliant
+# spec:
+#   securityContext:
+#     runAsNonRoot: true
+#     runAsUser: 1000
+#   containers:
+#   - name: app
+#     image: alpine:3.19
+#     command: ["sleep", "3600"]
+#     securityContext:
+#       privileged: false
+#       allowPrivilegeEscalation: false
+#       readOnlyRootFilesystem: true
+#     resources:
+#       requests:
+#         cpu: "100m"
+#         memory: "64Mi"
+#       limits:
+#         cpu: "200m"
+#         memory: "128Mi"
+#     livenessProbe:
+#       exec:
+#         command: ["sh", "-c", "exit 0"]
+#       initialDelaySeconds: 10
+#       periodSeconds: 15
+#       failureThreshold: 3
+#     readinessProbe:
+#       exec:
+#         command: ["sh", "-c", "exit 0"]
+#       initialDelaySeconds: 5
+#       periodSeconds: 10
+#       failureThreshold: 3
+
+# ── 14. No resources specified — mutated then ALLOWED ─────────────────────────
+# Submitted with zero resources. The mutating webhook (gatekeeper-policies/
+# mutations/) fills in requests/limits for cpu and memory before the
+# RequireResourceLimits validating constraint ever sees the object, so the
+# same Pod that would be DENIED in test #3 now passes.
+# Verify the injected defaults: kubectl get pod test-mutated-defaults -n test -o yaml
+# ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-privileged
+  name: test-mutated-defaults
   namespace: test
 spec:
   containers:
-  - name: test
+  - name: app
     image: alpine:3.19
-    securityContext:
-      privileged: true
+    command: ["sleep", "3600"]
 
-# 2. Missing resource limits — should be DENIED
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-no-limits
-  namespace: test
-spec:
-  containers:
-  - name: test
-    image: alpine:3.19
-
-# 3. hostNetwork — should be DENIED
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-hostnetwork
-  namespace: test
-spec:
-  hostNetwork: true
-  containers:
-  - name: test
-    image: alpine:3.19
-    resources:
-      requests: {cpu: 100m, memory: 64Mi}
-      limits: {cpu: 100m, memory: 64Mi}
-
-# 4. Disallowed registry — should be DENIED
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-bad-registry
-  namespace: test
-spec:
-  containers:
-  - name: test
-    image: docker.io/alpine:3.19
-    resources:
-      requests: {cpu: 100m, memory: 64Mi}
-      limits: {cpu: 100m, memory: 64Mi}
-
-# 5. Latest tag — should be DENIED
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-latest
-  namespace: test
-spec:
-  containers:
-  - name: test
-    image: alpine:latest
-    resources:
-      requests: {cpu: 100m, memory: 64Mi}
-      limits: {cpu: 100m, memory: 64Mi}
-
-# Check audit violations on existing resources
-# kubectl describe blockprivilegedcontainers block-privileged-containers
-# kubectl describe requireresourcelimits require-resource-limits
+# ── Audit existing violations ─────────────────────────────────────────────────
+# After applying, inspect audit mode violations on resources that already exist:
+#   kubectl describe blockprivilegedcontainers block-privileged-containers
+#   kubectl describe blockhostnamespaces block-host-namespaces
+#   kubectl describe blocklatesttag block-latest-tag
+#   kubectl describe requireresourcelimits require-resource-limits
+#   kubectl describe allowedimageregistry allowed-image-registry
+#   kubectl describe requireprobes require-probes

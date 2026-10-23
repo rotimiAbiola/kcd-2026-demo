@@ -7,14 +7,14 @@ resource "random_string" "falco_ui_password_minikube" {
 
 module "falco" {
   source = "./modules/argocd-helm-app"
-  count            = var.install_falco ? 1 : 0
+  count  = var.install_falco ? 1 : 0
 
   application_name = "falco"
   namespace        = "falco"
   project          = "default"
   repository_url   = "https://falcosecurity.github.io/charts"
   chart_name       = "falco"
-  chart_version    = "8.0.2"
+  chart_version    = "9.2.1"
   create_namespace = false
 
   sync_policy = {
@@ -31,11 +31,9 @@ module "falco" {
     # ── Driver ────────────────────────────────────────────────────────────────
     driver = {
       kind = "modern_ebpf"
-      # If `minikube ssh -- uname -r` returns < 5.8, swap to:
-      # kind = "kmod"
       modernEbpf = {
         leastPrivileged   = false
-        bufSizePreset     = 4  # keep low — minikube is single-node, low throughput
+        bufSizePreset     = 4
         cpusForEachBuffer = 2
         sysfsMount        = true
       }
@@ -43,7 +41,6 @@ module "falco" {
 
     tty = true
 
-    # ── No resource pressure on minikube — use minimal requests ───────────────
     resources = {
       requests = {
         cpu    = "100m"
@@ -55,12 +52,9 @@ module "falco" {
       }
     }
 
-    # No nodeSelector or tolerations needed on minikube single-node
     nodeSelector = {}
     tolerations  = []
 
-    # ── Metrics ───────────────────────────────────────────────────────────────
-    # Disable on minikube unless you have kube-prometheus-stack running there too
     metrics = {
       enabled = false
     }
@@ -69,10 +63,9 @@ module "falco" {
       create = false
     }
 
-    # ── Falco core config ─────────────────────────────────────────────────────
     falco = {
-      replicaCount = 1  # minikube is single-node, no HA needed
-      priority = "debug"
+      replicaCount = 1 
+      priority     = "debug"
 
       json_output                         = true
       json_include_output_property        = true
@@ -100,16 +93,37 @@ module "falco" {
 
       webserver = {
         enabled                    = true
-        prometheus_metrics_enabled = false  # no Prometheus on minikube
+        prometheus_metrics_enabled = false 
         listen_port                = 8765
       }
     }
 
-    # ── Falcosidekick ─────────────────────────────────────────────────────────
+    falcoctl = {
+      artifact = {
+        install = {
+          resources = {
+            requests = { cpu = "50m", memory = "64Mi" }
+            limits   = { cpu = "100m", memory = "128Mi" }
+          }
+        }
+        follow = {
+          resources = {
+            requests = { cpu = "50m", memory = "64Mi" }
+            limits   = { cpu = "100m", memory = "128Mi" }
+          }
+        }
+      }
+    }
+
     falcosidekick = {
-      enabled  = true
-      fullfqdn = false
-      replicaCount = 1 
+      enabled      = true
+      fullfqdn     = false
+      replicaCount = 1
+
+      resources = {
+        requests = { cpu = "50m", memory = "64Mi" }
+        limits   = { cpu = "200m", memory = "128Mi" }
+      }
 
       config = {
         slack = {
@@ -120,24 +134,16 @@ module "falco" {
       }
 
       webui = {
-        enabled = true
-        replicaCount = 1 
+        enabled      = true
+        replicaCount = 1
 
-        # minikube nginx ingress addon
-        ingress = {
-          enabled          = true
-          ingressClassName = "nginx"
-          annotations      = {}
-          hosts = [
-            {
-              host  = "falco.minikube.local"
-              paths = [{ path = "/" }]
-            }
-          ]
-          tls = []  # no TLS on minikube
+        service = {
+          type       = "NodePort"
+          port       = 2802
+          nodePort   = 30282
+          targetPort = 2802
         }
 
-        # Minimal resources for minikube
         resources = {
           requests = {
             cpu    = "50m"
@@ -151,37 +157,12 @@ module "falco" {
 
         loglevel = "info"
 
-        # No auth on minikube — remove user field entirely for open access
-        # or keep it if you want to test the auth flow
         user = "admin:${random_string.falco_ui_password_minikube[0].result}"
 
         redis = {
-          enabled = true  
+          enabled = true
         }
       }
     }
   })
 }
-
-# ── Namespace PSA label ───────────────────────────────────────────────────────
-# minikube doesn't enforce PSA by default but setting this is harmless
-# and keeps the module consistent with your GKE pattern
-# resource "kubernetes_namespace_v1" "falco_minikube" {
-#   count = var.install_falco_argocd ? 1 : 0
-
-#   metadata {
-#     name = "falco"
-#     labels = {
-#       "pod-security.kubernetes.io/enforce" = "privileged"
-#       "pod-security.kubernetes.io/audit"   = "privileged"
-#       "pod-security.kubernetes.io/warn"    = "privileged"
-#     }
-#   }
-
-#   lifecycle {
-#     ignore_changes = [
-#       metadata[0].annotations,
-#       metadata[0].labels,
-#     ]
-#   }
-# }

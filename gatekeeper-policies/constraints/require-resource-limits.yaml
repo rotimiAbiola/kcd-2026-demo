@@ -10,5 +10,5 @@ spec:
         kinds: ["Pod"]
     namespaceSelector:
       matchExpressions:
-        - key: pipeops.io/tenant
-          operator: Exists
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist

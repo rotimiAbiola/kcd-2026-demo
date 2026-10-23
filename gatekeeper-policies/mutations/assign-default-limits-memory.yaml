@@ -1,0 +1,32 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: demo-default-limits-memory
+  annotations:
+    description: >
+      Injects a default memory limit on any container that doesn't bring
+      its own. Pairs with assign-default-requests-cpu.yaml,
+      assign-default-requests-memory.yaml, and
+      assign-default-limits-cpu.yaml to fully satisfy the
+      RequireResourceLimits validating constraint.
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchExpressions:
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist
+  location: "spec.containers[name:*].resources.limits.memory"
+  parameters:
+    pathTests:
+      - subPath: "spec.containers[name:*].resources.limits.memory"
+        condition: MustNotExist
+    assign:
+      value: "128Mi"

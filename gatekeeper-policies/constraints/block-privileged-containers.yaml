@@ -8,9 +8,7 @@ spec:
     kinds:
       - apiGroups: [""]
         kinds: ["Pod"]
-    # Target tenant namespaces only — system namespaces exempt via webhook config
-    # Add your namespace naming pattern here
     namespaceSelector:
       matchExpressions:
-        - key: pipeops.io/tenant
-          operator: Exists
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist

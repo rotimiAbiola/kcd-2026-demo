@@ -6,11 +6,11 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = ">= 2.30.0"
+      version = "~> 3.1.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "3.0.0"
+      version = "~> 3.0.0"
     }
     argocd = {
       source  = "argoproj-labs/argocd"
@@ -42,12 +42,10 @@ provider "helm" {
 
 provider "argocd" {
   server_addr = var.argocd_server_addr
-  plain_text = true
-  insecure   = true
-  grpc_web   = true
+  plain_text  = true
+  insecure    = true
+  grpc_web    = true
 
-  # Use basic auth instead of token
   username = var.argocd_username
   password = var.argocd_password
-  # auth_token = var.argocd_auth_token
 }

@@ -1,0 +1,32 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: demo-default-limits-cpu
+  annotations:
+    description: >
+      Injects a default CPU limit on any container that doesn't bring its
+      own. Pairs with assign-default-requests-cpu.yaml,
+      assign-default-requests-memory.yaml, and
+      assign-default-limits-memory.yaml to fully satisfy the
+      RequireResourceLimits validating constraint.
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchExpressions:
+        - key: "gatekeeper.sh/ignore"
+          operator: DoesNotExist
+  location: "spec.containers[name:*].resources.limits.cpu"
+  parameters:
+    pathTests:
+      - subPath: "spec.containers[name:*].resources.limits.cpu"
+        condition: MustNotExist
+    assign:
+      value: "200m"
